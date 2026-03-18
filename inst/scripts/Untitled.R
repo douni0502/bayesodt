@@ -63,7 +63,7 @@ system.time({
   fit <- BayesODT(w=w, D=D, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
 
 print(fit)
-summary(fit, probs=c(0.05, 0.95))
+summary(fit)
 summary(fit)$a
 
 roc1 <- bayes_roc(fit, type = "ROC1")
