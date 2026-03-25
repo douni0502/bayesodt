@@ -2,18 +2,20 @@
 % Please edit documentation in R/method-roc.R
 \name{bayes_roc}
 \alias{bayes_roc}
-\title{Compute ROC curves from a fitted BayesODT object}
+\title{Generic function for ROC curve extraction
+Extracts ROC curve information from a fitted object.}
 \usage{
-bayes_roc(object)
+bayes_roc(object, ...)
 }
 \arguments{
-\item{object}{A fitted object.}
+\item{object}{A fitted model object.}
 
 \item{...}{Additional arguments passed to methods.}
 }
 \value{
-An object representing ROC curve information.
+An object of class \code{"BayesODT_roc"}.
 }
 \description{
-Generic function for extracting ROC curve information from fitted objects.
+Generic function for ROC curve extraction
+Extracts ROC curve information from a fitted object.
 }

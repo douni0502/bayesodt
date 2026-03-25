@@ -125,3 +125,4 @@ head(cluster_raters(fit))
 cl <- cluster_raters(fit)
 attr(cl, "k_selected")
 attr(cl, "silhouette_scores")
+

@@ -2,7 +2,8 @@
 % Please edit documentation in R/method-roc.R
 \name{print.BayesODT_roc}
 \alias{print.BayesODT_roc}
-\title{Print a BayesODT ROC object}
+\title{Print a BayesODT ROC object
+Displays a concise summary of an object returned by \code{\link[=bayes_roc]{bayes_roc()}}.}
 \usage{
 \method{print}{BayesODT_roc}(x, ...)
 }
@@ -15,5 +16,6 @@
 The input object \code{x}, invisibly.
 }
 \description{
-Displays basic information about an object returned by \code{bayes_roc()}.
+Print a BayesODT ROC object
+Displays a concise summary of an object returned by \code{\link[=bayes_roc]{bayes_roc()}}.
 }

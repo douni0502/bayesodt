@@ -2,7 +2,7 @@
 % Please edit documentation in R/method-roc.R
 \name{bayes_roc.BayesODT}
 \alias{bayes_roc.BayesODT}
-\title{Compute ROC curves for BayesODT objects}
+\title{Compute ROC curves for a fitted BayesODT object}
 \usage{
 \method{bayes_roc}{BayesODT}(
   object,
@@ -16,31 +16,26 @@
 \arguments{
 \item{object}{An object of class \code{"BayesODT"}.}
 
-\item{type}{Type of ROC curve to compute. One of \code{"individual"},
-\code{"ROC1"}, \code{"ROC2"}, \code{"smoothed"}, \code{"pROC"}, or \code{"smoothed.pROC"}.}
+\item{type}{Type of ROC curve to compute. One of \code{"individual"}, \code{"ROC1"}, \code{"ROC2"}, \code{"smoothed"}, \code{"pROC"}, or \code{"smoothed.pROC"}.}
 
 \item{rater}{Integer rater index used when \code{type = "individual"}.}
 
-\item{h}{Numeric vector of threshold values used when
-\code{type = "smoothed"}.}
+\item{h}{Numeric vector of threshold values used when \code{type = "smoothed"}.}
+
+\item{probs}{Numeric vector of probabilities used to compute credible intervals for posterior-based AUC estimates.}
 
 \item{...}{Further arguments passed to or from other methods.}
 }
 \value{
-An object of class \code{"BayesODT_roc"} containing false-positive
-rates, true-positive rates, AUC, and related ROC information.
+An object of class \code{"BayesODT_roc"} containing ROC coordinates, AUC summaries, and related metadata.
 }
 \description{
-Extract ROC curve information from a fitted \code{"BayesODT"} object.
-Posterior draws are combined across all saved MCMC chains before the
-ROC summaries are computed.
+Extract ROC curve summaries from a fitted \code{"BayesODT"} object.
+Posterior draws from all saved MCMC chains are combined before posterior-based ROC summaries are computed.
 }
 \details{
-For posterior-model-based ROC types (\code{"individual"}, \code{"ROC1"},
-\code{"ROC2"}, and \code{"smoothed"}), saved posterior draws are first combined
-across chains and then averaged to obtain ROC summaries.
+For posterior-model-based ROC types, saved posterior draws are first combined across chains.
+The \code{"individual"}, \code{"ROC1"}, and \code{"ROC2"} summaries are obtained by posterior averaging, whereas \code{"smoothed"} uses posterior mean parameter estimates on a fine threshold grid.
 
-The empirical ROC types (\code{"pROC"} and \code{"smoothed.pROC"}) are computed
-directly from the observed ratings and therefore require observed
-disease status \code{D}.
+The empirical ROC types (\code{"pROC"} and \code{"smoothed.pROC"}) are computed directly from the observed ratings and therefore require observed disease status \code{D}.
 }
