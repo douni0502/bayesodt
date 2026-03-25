@@ -4,7 +4,7 @@
 \alias{bayes_roc}
 \title{Compute ROC curves from a fitted BayesODT object}
 \usage{
-bayes_roc(object, ...)
+bayes_roc(object)
 }
 \arguments{
 \item{object}{A fitted object.}

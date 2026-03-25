@@ -7,7 +7,7 @@
 #'
 #' @return An object representing ROC curve information.
 #' @export
-bayes_roc <- function(object, ...) {
+bayes_roc <- function(object) {
   UseMethod("bayes_roc")
 }
 

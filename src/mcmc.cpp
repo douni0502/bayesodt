@@ -5,8 +5,38 @@
 #include <fntl.h>
 using namespace Rcpp;
 
-// Update latent ordinal variables Z_ij.
-// Observed entries are sampled from truncated N(a_j + b_j * u_i, 1) according to the observed category; missing entries are sampled from the corresponding untruncated normal distribution.
+
+// Update latent disease-status variables z0_i.
+// If D_i = 1, then z0_i is sampled from N(u_i, 1) truncated to (0, Inf).
+// If D_i = 0, then z0_i is sampled from N(u_i, 1) truncated to (-Inf, 0).
+// idx1 and idx0 are the 1-based indices from R indicating D_i = 1 and D_i = 0, respectively.
+NumericVector sample_z0(NumericVector u,
+                        IntegerVector idx1, IntegerVector idx0) {
+  RNGScope scope;
+  int m = u.size();
+  NumericVector z0(m);
+
+  // idx1, idx0 는 R의 which() 결과라 1-based
+  for (int t = 0; t < idx1.size(); ++t) {
+    int i = idx1[t] - 1;
+    double mu = u[i];
+    z0[i] = RcppTN::rtn1(mu, 1.0, 0.0, R_PosInf);     // (0, Inf)
+  }
+
+  for (int t = 0; t < idx0.size(); ++t) {
+    int i = idx0[t] - 1;
+    double mu = u[i];
+    z0[i] = RcppTN::rtn1(mu, 1.0, R_NegInf, 0.0);     // (-Inf, 0)
+  }
+
+  return z0;
+}
+
+// Update latent ordinal variables z_ij.
+// For observed entries, each z_ij is sampled from a truncated normal distribution with mean a_j + b_j * u_i and variance 1, where the truncation interval is
+// determined by the observed ordinal category.
+// For missing entries, each z_ij is sampled from the corresponding untruncated normal distribution N(a_j + b_j * u_i, 1).
+// W_list contains category-specific observed positions, and W_miss contains the missing positions. All indices from R are 1-based.
 NumericMatrix sample_z_ij(NumericMatrix z, NumericVector a, NumericVector b, NumericVector u, NumericVector k_lower, NumericVector k_upper,
                           List W_list, SEXP W_miss) {
   RNGScope scope;
@@ -61,8 +91,10 @@ NumericMatrix sample_z_ij(NumericMatrix z, NumericVector a, NumericVector b, Num
   return z;
 }
 
-// Update latent disease severities u_i when D is unknown.
-// Samples u_i from its Gaussian full conditional and then centers the sampled vector to have mean 0 for identifiability.
+
+// Update latent disease severities u_i when disease status D is unknown.
+// Each u_i is sampled from its Gaussian full conditional distribution given the current latent ratings z and item-specific parameters a and b.
+// After sampling, the vector u is centered to have mean 0 in order to enforce identifiability of the latent scale.
 NumericVector sample_u_i_unknown(const NumericMatrix& z, const NumericVector& a, const NumericVector& b, const double mu_u, const double tau_u) {
   RNGScope scope;
 
@@ -104,8 +136,10 @@ NumericVector sample_u_i_unknown(const NumericMatrix& z, const NumericVector& a,
 }
 
 
-// Update latent disease severities u_i when D is known.
-// Samples u_i from its Gaussian full conditional given z and z0, then applies a common shift so that mean(Phi(u_i)) matches mean(D).
+// Update latent disease severities u_i when disease status D is known.
+// Each u_i is first sampled from its Gaussian full conditional distribution given z, z0, a, and b.
+// Then a common shift c is added to all sampled u_i values so that mean(Phi(u_i + c)) matches the observed prevalence mean(D), where Phi denotes the standard normal CDF.
+// The shift is found by Brent's root-finding method.
 NumericVector sample_u_i_known(const NumericMatrix& z, const NumericVector& a, const NumericVector& b, const NumericVector& z0, const NumericVector& D,
                                const double mu_u, const double tau_u,
                                const double tol = 1e-8, const unsigned int max_iter = 200) {
@@ -151,7 +185,7 @@ NumericVector sample_u_i_known(const NumericMatrix& z, const NumericVector& a, c
     return s / (double)m - target;
   };
 
-  // bracket 찾기 (R 코드와 동일한 전략)
+  // find bracket
   double low = -20.0, high = 20.0;
   double flow = f(low), fhigh = f(high);
 
@@ -198,34 +232,14 @@ NumericVector sample_u_i_known(const NumericMatrix& z, const NumericVector& a, c
 
 
 
-// Update latent disease-status variables z0_i.
-// For D_i = 1, sample z0_i from N(u_i, 1) truncated to (0, Inf); for D_i = 0, sample z0_i from N(u_i, 1) truncated to (-Inf, 0).
-// idx1 and idx0 are 1-based indices from R.
-NumericVector sample_z0(NumericVector u,
-                        IntegerVector idx1, IntegerVector idx0) {
-  RNGScope scope;
-  int m = u.size();
-  NumericVector z0(m);
 
-  // idx1, idx0 는 R의 which() 결과라 1-based
-  for (int t = 0; t < idx1.size(); ++t) {
-    int i = idx1[t] - 1;
-    double mu = u[i];
-    z0[i] = RcppTN::rtn1(mu, 1.0, 0.0, R_PosInf);     // (0, Inf)
-  }
-
-  for (int t = 0; t < idx0.size(); ++t) {
-    int i = idx0[t] - 1;
-    double mu = u[i];
-    z0[i] = RcppTN::rtn1(mu, 1.0, R_NegInf, 0.0);     // (-Inf, 0)
-  }
-
-  return z0;
-}
 
 // Update cutpoints A_k for the ordinal model.
-// Each cutpoint is sampled uniformly from its full conditional interval, determined by (i) neighboring cutpoints, (ii) the spacing constraint delta, and (iii) the current latent z values in adjacent categories.
-// W_list contains 1-based linear indices for entries in each observed category.
+// Each cutpoint is sampled uniformly from its full conditional feasible interval, determined by:
+//   (i) the neighboring cutpoints,
+//   (ii) the spacing constraint delta, and
+//   (iii) the current latent z values in adjacent ordinal categories.
+// W_list contains the 1-based linear indices of observed entries for each category.
 NumericVector sample_A(NumericVector A, int K, NumericMatrix z, double delta,
                        List W_list) {
   RNGScope scope;
@@ -309,7 +323,15 @@ NumericVector sample_A(NumericVector A, int K, NumericMatrix z, double delta,
 }
 
 
-
+// Perform one MCMC update step for the ordinal latent-variable model.
+// This function updates the current state block by block:
+//   1. latent variables z0, z, and u,
+//   2. item-specific parameters a and b,
+//   3. hyperparameters tau_a, mu_b, and tau_b,
+//   4. cutpoints A.
+// If D is NULL, u is updated under the unknown-status model.
+// If D is provided, z0 and u are updated under the known-status model.
+// The function returns the updated state after one full Gibbs/MCMC sweep.
 List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVector> D, NumericVector a, NumericVector b, NumericVector A,
           double mu_a, double tau_a, double mu_b, double tau_b, double mu_u, double tau_u, double gamma, double delta, double tau,
           int K, List W_list, SEXP W_miss, Nullable<IntegerVector> idx1, Nullable<IntegerVector> idx0,
@@ -332,13 +354,11 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
 
   if (known) {
     Dv = as<NumericVector>(D);
-    if (Dv.size() != m) stop("D must have length m");
-
     idx1v = IntegerVector(idx1);
     idx0v = IntegerVector(idx0);
   }
 
-  // ---- z0, z, u 업데이트 ----
+  // ---- z0, z, u update ----
   if (!known) {
     z = sample_z_ij(z, a, b, u, k_lower, k_upper, W_list, W_miss);
     u = sample_u_i_unknown(z, a, b, mu_u, tau_u);
@@ -348,7 +368,7 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
     u = sample_u_i_known(z, a, b, z0, Dv, mu_u, tau_u, tol_shift, max_iter_shift);
   }
 
-  // ---- a 업데이트 ----
+  // ---- a update ----
   double sum_u = 0.0;
   for (int i = 0; i < m; ++i) sum_u += u[i];
 
@@ -366,7 +386,7 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
     a[j] = R::rnorm(mean_aj, sd_a);
   }
 
-  // ---- b 업데이트 ----
+  // ---- b update ----
   double sum_u2 = 0.0;
   for (int i = 0; i < m; ++i) sum_u2 += u[i] * u[i];
 
@@ -380,7 +400,18 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
     b[j] = R::rnorm(mean_bj, sd_b);
   }
 
-  // ---- tau_a 업데이트 (Gamma: shape/rate -> R::rgamma는 shape/scale) ----
+  // ---- mu_b udpate ----
+  double sum_b = 0.0;
+  for (int j = 0; j < n; ++j) sum_b += b[j];
+
+  {
+    const double den_mub = (double)n * tau_b + tau;
+    const double mean_mub = (tau_b * sum_b) / den_mub;
+    const double sd_mub = std::sqrt(1.0 / den_mub);
+    mu_b = R::rnorm(mean_mub, sd_mub);
+  }
+
+  // ---- tau_a update ----
   double ss_a = 0.0;
   for (int j = 0; j < n; ++j) {
     const double d = a[j] - mu_a;
@@ -390,17 +421,6 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
     const double shape = gamma + 0.5 * (double)n;
     const double rate  = gamma + 0.5 * ss_a;
     tau_a = R::rgamma(shape, 1.0 / rate);
-  }
-
-  // ---- mu_b 업데이트 ----
-  double sum_b = 0.0;
-  for (int j = 0; j < n; ++j) sum_b += b[j];
-
-  {
-    const double den_mub = (double)n * tau_b + tau;
-    const double mean_mub = (tau_b * sum_b) / den_mub;
-    const double sd_mub = std::sqrt(1.0 / den_mub);
-    mu_b = R::rnorm(mean_mub, sd_mub);
   }
 
   // ---- tau_b 업데이트 ----
@@ -415,14 +435,19 @@ List MCMC(NumericMatrix z, NumericVector z0, NumericVector u, Nullable<NumericVe
     tau_b = R::rgamma(shape, 1.0 / rate);
   }
 
-  // ---- A 업데이트 ----
+  // ---- A update ----
   A = sample_A(A, K, z, delta, W_list);
 
-  return List::create(_["z0"] = z0, _["z"] = z, _["u"] = u, _["a"] = a, _["b"] = b, _["A"] = A,
-                      _["tau_a"] = tau_a, _["mu_b"] = mu_b, _["tau_b"] = tau_b);
+  return List::create(_["z0"] = z0, _["z"] = z, _["u"] = u, _["a"] = a, _["b"] = b, _["A"] = A, _["tau_a"] = tau_a, _["mu_b"] = mu_b, _["tau_b"] = tau_b);
 }
 
-
+// Run the full MCMC algorithm for multiple iterations.
+// Starting from the supplied initial state, this function repeatedly calls MCMC() to update the chain.
+// Posterior samples are stored after burn-in and according to the thinning interval.
+// The returned object contains:
+//   (i) saved posterior draws for A, a, b, u, tau_a, mu_b, and tau_b,
+//   (ii) the total number of saved samples,
+//   (iii) the final state of the chain (state_last), which can be used to continue the MCMC run later.
 // [[Rcpp::export]]
 List MCMC_loop(List state, Nullable<NumericVector> D,
                double mu_a, double tau_a, double mu_b, double tau_b, double mu_u, double tau_u, double gamma, double delta, double tau,
@@ -449,8 +474,8 @@ List MCMC_loop(List state, Nullable<NumericVector> D,
 
   NumericMatrix A_save(num, K - 1);   // cutpoints
   NumericMatrix a_save(num, n);       // rater bias
-  NumericMatrix b_save(num, n);       // rater magnifier/scale
-  NumericMatrix u_save(num, m);       // latent patient effects
+  NumericMatrix b_save(num, n);       // rater magnifier
+  NumericMatrix u_save(num, m);       // latent disease severity
   NumericVector tau_a_save(num);
   NumericVector mu_b_save(num);
   NumericVector tau_b_save(num);
@@ -459,9 +484,9 @@ List MCMC_loop(List state, Nullable<NumericVector> D,
 
   for (int iter = 1; iter <= n_iter; ++iter) {
     List up = MCMC(z, z0, u, D, a, b, A,
-      mu_a, tau_a_cur, mu_b_cur, tau_b_cur, mu_u, tau_u, gamma, delta, tau, K, W_list, W_miss, idx1, idx0,
-      tol_shift, max_iter_shift
-    );
+                   mu_a, tau_a_cur, mu_b_cur, tau_b_cur, mu_u, tau_u, gamma, delta, tau,
+                   K, W_list, W_miss, idx1, idx0,
+                   tol_shift, max_iter_shift);
 
     // overwrite current state
     z  = as<NumericMatrix>(up["z"]);

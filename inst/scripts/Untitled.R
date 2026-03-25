@@ -60,7 +60,7 @@ traceplot(m_B)
 ################
 set.seed(1)
 system.time({
-  fit <- BayesODT(w=w, D=D, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
+  fit <- BayesODT(w=w, D=D, inits = init)})#, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
 
 print(fit)
 summary(fit)

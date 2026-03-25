@@ -2,7 +2,7 @@
 % Please edit documentation in R/BayesODT.R
 \name{BayesODT}
 \alias{BayesODT}
-\title{Fit the Bayesian ordinal diagnostic-trial model}
+\title{Fit a Bayesian Hierarchical ordinal diagnostic test model}
 \usage{
 BayesODT(
   w,
@@ -16,14 +16,13 @@ BayesODT(
 )
 }
 \arguments{
-\item{w}{A numeric matrix of ordinal ratings. Observed entries must be consecutive integers \verb{1, 2, ..., K}. Missing values (\code{NA}) are allowed.}
+\item{w}{An \eqn{m \times n} matrix of ordinal ratings with values in \code{1, \dots, K}. Missing ratings should be coded as \code{NA}.}
 
-\item{D}{Optional binary vector of true disease status, coded as \code{0} and \code{1}. If \code{NULL}, disease status is treated as unknown.}
+\item{D}{An optional binary vector of length \code{m}. If supplied, it represents the true disease status for each subject; if \code{NULL}, the disease status is treated as unknown.}
 
-\item{inits}{Optional initial values. For a single chain, this should be a named list containing any subset of \code{z}, \code{z0}, \code{a}, \code{b}, \code{u}, and \code{A}.
-For multiple chains, this can be either a single named list used as a template for all chains, or an unnamed list of chain-specific named lists.}
+\item{inits}{An optional list of initial values. If \code{NULL}, default initial values are generated internally.}
 
-\item{prior}{Optional named list of prior hyperparameters. Allowed elements are \code{mu_a}, \code{tau_a}, \code{mu_b}, \code{tau_b}, \code{delta}, \code{gamma}, \code{tau}, \code{mu_u}, and \code{tau_u}. Missing elements are filled with default values.}
+\item{prior}{An optional list of prior hyperparameters. If \code{NULL}, default prior values are used.}
 
 \item{n.chains}{Number of MCMC chains.}
 
@@ -34,39 +33,27 @@ For multiple chains, this can be either a single named list used as a template f
 \item{n.thin}{Thinning interval.}
 }
 \value{
-An object of class \code{"BayesODT"}, which is a list containing:
-\describe{
-\item{chains}{A list of chain-specific posterior samples.}
-\item{D}{The supplied disease status vector.}
-\item{w}{The supplied rating matrix.}
-\item{mcmc_info}{A list containing MCMC settings and the number of saved draws.}
-\item{dim_info}{A list containing \code{m}, \code{n}, and \code{K}.}
-\item{param_names}{Parameter names used internally.}
-\item{call}{The matched function call.}
-}
-
-Each element of \code{chains} contains posterior samples for \code{A}, \code{a}, \code{tau_a}, \code{b}, \code{mu_b}, \code{tau_b}, and \code{u}, together with \code{num} and \code{state_last}.
+An object of class \code{"BayesODT"} containing posterior samples from each chain, the input data, MCMC settings, dimension information, parameter labels, and the matched function call.
 }
 \description{
-Fits the Bayesian ordinal diagnostic-trial model for ordinal rating data, with optional known disease status.
-Posterior samples are obtained by MCMC.
-The function returns chain-specific posterior samples for the cutpoints, rater-specific parameters, latent disease severities, and hyperparameters, along with the last state of each chain.
+Fit the Bayesian Hierarchical ordinal diagnostic test model for multirater ordinal data using MCMC.
+The model is a two-stage latent variable model for ordinal ratings and allows the true binary disease status to be either observed or unobserved.
 }
 \details{
-The model is fit by Gibbs sampling with latent-variable augmentation.
-When \code{D} is provided, the known disease-status version of the model is used.
-When \code{D = NULL}, the unknown disease-status version is used.
+Let \eqn{W_{ij}} denote the ordinal rating assigned by rater \eqn{j} to subject \eqn{i}, and let \eqn{u_i} denote a latent disease severity.
+The model links disease status and ordinal ratings through a probit formulation, with rater-specific bias parameters \eqn{a_j}, magnifier parameters \eqn{b_j}, and common cutpoints.
+See Kim, Lin, and Nelson (2021) for model details. Missing ratings are allowed.
 }
 \examples{
-\dontrun{
-set.seed(1)
-w <- matrix(sample(1:5, 50, replace = TRUE), nrow = 10, ncol = 5)
-D <- sample(0:1, 10, replace = TRUE)
+set.seed(123)
+w <- matrix(sample(1:3, 24, replace = TRUE), nrow = 8, ncol = 3)
+fit <- BayesODT(w, n.chains = 1, n.iter = 20, n.burnin = 10, n.thin = 2)
+fit
 
-fit <- BayesODT(w, D, n.chains = 2, n.iter = 2000, n.burnin = 1000, n.thin = 5)
-
-fit$mcmc_info
-names(fit$chains[[1]])
 }
-
+\references{
+Kim C, Lin X, Nelson KP (2021).
+\emph{Measuring rater bias in diagnostic tests with ordinal ratings}.
+\emph{Statistics in Medicine}, \strong{40}(18), 4014--4033.
+doi:10.1002/sim.9011.
 }
