@@ -16,9 +16,7 @@
 #'
 #' @details
 #' Posterior draws are combined across all chains before summaries are computed.
-#' Matrix-valued parameters are summarized column-wise. For interpretability,
-#' the posterior draws of `a` are centered by subtracting the grand mean of all
-#' saved `a` draws, and the same shift is applied to the posterior draws of `A`.
+#' Matrix-valued parameters are summarized column-wise.
 #'
 #' @export
 summary.BayesODT <- function(object,
@@ -91,17 +89,6 @@ summary.BayesODT <- function(object,
   mu_b_samples  <- .combine_chain_samples(chains, "mu_b")
   tau_b_samples <- .combine_chain_samples(chains, "tau_b")
   u_samples     <- .combine_chain_samples(chains, "u")
-
-  # apply the same global shift used in the original summary code:
-  # a <- a - mean(a), A <- A - mean(a)
-  a_shift <- NULL
-  if (!is.null(a_samples)) {
-    a_shift <- mean(a_samples)
-    a_samples <- a_samples - a_shift
-  }
-  if (!is.null(A_samples) && !is.null(a_shift)) {
-    A_samples <- A_samples - a_shift
-  }
 
   # missing-rating information
   if (!is.null(object$w)) {

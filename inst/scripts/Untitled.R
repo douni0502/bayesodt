@@ -46,7 +46,9 @@ w <- make_MCAR(w, 0.2)
 
 set.seed(1)
 system.time({
-  fit <- BayesODT_draft(w=w, D=D, init=init3, prior=prior)})
+  fit <- BayesODT_draft(w=w, D=D, init=init2, prior=prior)})
+
+
 str(fit)
 head(fit$alpha)
 library(coda)
@@ -60,14 +62,13 @@ traceplot(m_B)
 ################
 set.seed(1)
 system.time({
-  fit <- BayesODT(w=w, D=D, inits = init)})#, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
+  fit2 <- BayesODT(w=w, D=D, inits = init)})#, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
 
 print(fit)
 summary(fit)
 summary(fit)$a
 
-roc1 <- bayes_roc(fit, type = "ROC1")
-str(roc1)
+roc1 <- bayes_roc(fit, type = "ROC1"); str(roc1)
 
 roc2 <- bayes_roc(fit, type = "ROC2"); str(roc2)
 roc_ind <- bayes_roc(fit, type = "individual", rater = 2); str(roc_ind)

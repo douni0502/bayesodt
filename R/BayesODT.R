@@ -111,6 +111,16 @@ BayesODT <- function(w, D = NULL,
                                W_list = W_list, W_miss = W_miss, idx1 = idx1, idx0 = idx0,
                                n_iter = n.iter, n_burnin = n.burnin, n_thin = n.thin)
   }
+
+  for (i in seq_len(n.chains)) {
+    a_mat <- fit_list[[i]]$a
+    A_mat <- fit_list[[i]]$A
+
+    a_shift <- mean(a_mat)
+
+    fit_list[[i]]$a <- a_mat - a_shift
+    fit_list[[i]]$A <- A_mat - a_shift
+  }
   out <- list(chains = fit_list, D = D, w = w)
   out$mcmc_info <- list(n.chains = n.chains, n.iter = n.iter, n.burnin = n.burnin, n.thin = n.thin, n.save = fit_list[[1]]$num)
   out$dim_info <- list(m = m, n = n, K = K)
