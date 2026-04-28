@@ -27,7 +27,5 @@ equal-tailed credible interval are reported.
 }
 \details{
 Posterior draws are combined across all chains before summaries are computed.
-Matrix-valued parameters are summarized column-wise. For interpretability,
-the posterior draws of \code{a} are centered by subtracting the grand mean of all
-saved \code{a} draws, and the same shift is applied to the posterior draws of \code{A}.
+Matrix-valued parameters are summarized column-wise.
 }
