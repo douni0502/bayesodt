@@ -25,8 +25,8 @@ devtools::load_all()               # 다시 컴파일 + 로드
 
 prior <- list(mu_a = 0, tau_a = 1, mu_b = 0, tau_b = 1, delta = 5, gamma = 0.1, tau = 0.1, mu_u = 0, tau_u = 1)
 
-
-data <- simulate_data()
+set.seed(33)
+data <- simulate_data(m=90, n=50)
 W <- data$W
 D <- data$D
 
@@ -47,26 +47,26 @@ w <- make_MCAR(w, 0.2)
 
 
 ########### bayesodt 초안 실험 (교수님) ######################
-
-set.seed(1)
-system.time({
-  fit <- BayesODT_draft(w=w, D=D, init=init2, prior=prior)})
-
-
-str(fit)
-head(fit$alpha)
-library(coda)
-m_alpha <- mcmc(fit$alpha)
-m_A <- mcmc(fit$A)
-m_B <- mcmc(fit$B)
-traceplot(m_alpha)
-traceplot(m_A)
-traceplot(m_B)
+#
+# set.seed(1)
+# system.time({
+#   fit <- BayesODT_draft(w=w, D=D, init=init2, prior=prior)})
+#
+#
+# str(fit)
+# head(fit$alpha)
+# library(coda)
+# m_alpha <- mcmc(fit$alpha)
+# m_A <- mcmc(fit$A)
+# m_B <- mcmc(fit$B)
+# traceplot(m_alpha)
+# traceplot(m_A)
+# traceplot(m_B)
 
 ################
-set.seed(1)
+# set.seed(1)
 system.time({
-  fit <- BayesODT(w=W, D=D)})#, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
+  fit <- BayesODT(w=W, D=D, n.chains = 2, n.iter=45000, n.burnin=20000, n.thin = 5)})#, n.chains=1, prior=prior, n.thin=5, n.burnin=2000, n.iter=4000)})
 
 print(fit)
 summary(fit)
@@ -82,52 +82,45 @@ roc_emp.sm <- bayes_roc(fit, type = "smoothed.pROC"); str(roc_emp.sm)
 
 # plot
 plot(fit, which="ABU")
-plot(fit, which="ROC", type="individual", rater=10)
+par(mfrow = c(2, 2))
+plot(fit, which="ROC", type="ROC1")
+plot(fit, which="ROC", type="ROC2")
+plot(fit, which="ROC", type= "smoothed")
 plot(fit, which="ROC", type="individual", rater= c(1,2,10,14,17))
+dev.off()
 plot(fit, which="Udist")
 
 # mcmc 또는 mcmc.list 형식으로 바꿔주는
-m <- as.mcmc(fit, param = "A", index = 1)
+m <- as.mcmc(fit, param="a", index=10)
+m_all <- as.mcmc_all(fit, param=c("A", "tau_a", "mu_b", "tau_b"))
+
+library(coda)
+
+gelman.diag(m_all)
+plot(m_all)
+
 coda::traceplot(m)
 # traceplot
+par(mfrow = c(2, 3))
 plot_trace(fit, param = "A")
-plot_trace(fit, param = "a", index = c(1,2,3))
-plot_trace(fit, param = "b", index = c(1, 2, 3))
-plot_trace(fit, param = "u", index = c(5, 10))
+plot_trace(fit, param = "a", index = 17)
+plot_trace(fit, param = "b", index = 21)
+plot_trace(fit, param = "u", index = 35)
 plot_trace(fit, param = "tau_a")
 plot_trace(fit, param = "mu_b")
 plot_trace(fit, param = "tau_b")
+dev.off()
 
-
-# effective sample size
-effective_size(fit, param = "A", index = 1:3)
-effective_size(fit, param = "a", index = 1:5)
-
-
-# autocorr plot
-plot_autocorr(fit, param = "A", index = 1:3)
-plot_autocorr(fit, param = "b", index = c(1, 2, 3))
-
-
-# Geweke_diag
-geweke_diag(fit, param = "A", index = c(1, 2, 3), frac1 = 0.1, frac2 = 0.1)
-
-
-# heidel_diag
-heidel_diag(fit, param = "A", index = c(1,2,3))
-
-# density plot
-plot_density(fit, param = "a", index = c(1, 2, 3, 4, 5, 6, 7, 8))
 
 
 # rater anaylsis
-plot_rater_map(fit)
-plot_rater_map(fit, color_by = "group", show_intervals = FALSE)
-plot_rater_map(fit, color_by = "cluster", show_intervals = FALSE)
-head(group_raters(fit))
-head(cluster_raters(fit))
+group_raters(fit)
+print(m)
+plot_rater_map(fit,
+               show_intervals = FALSE,
+               group = TRUE)
 
-cl <- cluster_raters(fit)
-attr(cl, "k_selected")
-attr(cl, "silhouette_scores")
+
+gof <- GoF(fit)
+print(gof)
 

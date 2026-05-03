@@ -215,6 +215,7 @@ plot.BayesODT_roc <- function(x,
                  ylim = c(min(a.lo) - 0.1, max(a.hi) + 0.1),
                  ylab = expression(a[j]),
                  xlab = "rater",
+                 main = "Estimation of Rater Bias Terms a_j",
                  cex.lab = 1.2)
   graphics::abline(h = 0, col = "gray")
   graphics::arrows(seq_len(n), a.lo, seq_len(n), a.hi,
@@ -229,6 +230,7 @@ plot.BayesODT_roc <- function(x,
                  ylim = c(min(b.lo) - 0.1, max(b.hi) + 0.1),
                  ylab = expression(b[j]),
                  xlab = "rater",
+                 main = "Estimation of Rater Magnifier Terms b_j",
                  cex.lab = 1.2)
   graphics::abline(h = mean(b.data), col = "gray")
   graphics::arrows(seq_len(n), b.lo, seq_len(n), b.hi,
@@ -242,7 +244,8 @@ plot.BayesODT_roc <- function(x,
   graphics::plot(seq_len(m), u.mean,
                  ylim = c(min(u.lo) - 0.1, max(u.hi) + 0.1),
                  ylab = expression(u[i]),
-                 xlab = "subject",
+                 xlab = "patient",
+                 main = "Estimation of Patient Latent Traits u_i",
                  cex.lab = 1.2)
   graphics::arrows(seq_len(m), u.lo, seq_len(m), u.hi,
                    angle = 90, code = 3, length = 0.03)

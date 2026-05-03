@@ -4,39 +4,29 @@
 \alias{group_raters}
 \title{Group raters based on posterior summaries of bias and magnifier}
 \usage{
-group_raters(
-  x,
-  method = c("quadrant"),
-  a_cut = NULL,
-  b_cut = NULL,
-  probs = c(0.025, 0.975),
-  labels = c("low bias / low magnifier", "high bias / low magnifier",
-    "low bias / high magnifier", "high bias / high magnifier"),
-  include_summary = TRUE,
-  ...
-)
+group_raters(x, probs = c(0.025, 0.975), ...)
 }
 \arguments{
 \item{x}{A fitted object of class \code{"BayesODT"}.}
+
+\item{probs}{Length-2 numeric vector of posterior probabilities used for
+credible intervals in the returned summary.}
+
+\item{...}{Not used.}
 
 \item{method}{Grouping rule. Currently only \code{"quadrant"} is supported.}
 
 \item{a_cut}{Cutoff for bias. If \code{NULL}, uses 0.}
 
-\item{b_cut}{Cutoff for magnifier. If \code{NULL}, uses the median of posterior
+\item{b_cut}{Cutoff for magnifier. If \code{NULL}, uses the mean of posterior
 mean magnifiers.}
 
-\item{probs}{Length-2 numeric vector of posterior probabilities used for
-credible intervals in the returned summary.}
-
 \item{labels}{Character vector of length 4 giving group labels in the order:
-\code{c("low bias / low magnifier", "high bias / low magnifier",
-  "low bias / high magnifier", "high bias / high magnifier")}.}
+\code{c("low bias / low magnifier", "low bias / high magnifier",
+  "high bias / low magnifier", "high bias / high magnifier")}.}
 
 \item{include_summary}{Logical; if \code{TRUE}, include posterior summary
 columns for \eqn{a_j} and \eqn{b_j}.}
-
-\item{...}{Not used.}
 }
 \value{
 A data frame with rater group assignments.
@@ -47,5 +37,13 @@ of rater-specific bias \eqn{a_j} and magnifier \eqn{b_j}.
 }
 \details{
 By default, raters are divided into four groups using the posterior means
-of centered \eqn{a_j} and \eqn{b_j}, relative to user-specified cutoffs.
+of centered \eqn{a_j} and \eqn{b_j}.
+
+Group codes are defined as:
+\describe{
+\item{1}{low bias / low magnifier}
+\item{2}{low bias / high magnifier}
+\item{3}{high bias / low magnifier}
+\item{4}{high bias / high magnifier}
+}
 }

@@ -8,7 +8,7 @@
   object,
   type = c("individual", "ROC1", "ROC2", "smoothed", "pROC", "smoothed.pROC"),
   rater = 1L,
-  h = seq(-5, 5, length.out = 200),
+  h = seq(-5, 5, length.out = 1000),
   probs = c(0.025, 0.975),
   ...
 )

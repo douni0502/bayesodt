@@ -36,7 +36,7 @@ bayes_roc.BayesODT <- function(object,
                                type = c("individual", "ROC1", "ROC2",
                                         "smoothed", "pROC", "smoothed.pROC"),
                                rater = 1L,
-                               h = seq(-5, 5, length.out = 200),
+                               h = seq(-5, 5, length.out = 1000),
                                probs = c(0.025, 0.975),
                                ...) {
   type <- match.arg(type)
@@ -245,6 +245,24 @@ bayes_roc.BayesODT <- function(object,
 }
 
 
+# Compute AUC samples over all individual raters and posterior draws
+.compute_all_rater_auc_samples <- function(comp) {
+  auc_samples <- numeric(comp$n * comp$num)
+
+  idx <- 1L
+  for (s in seq_len(comp$num)) {
+    for (j in seq_len(comp$n)) {
+      auc_samples[idx] <- .compute_auc(
+        comp$p0.ind[j, , s],
+        comp$p1.ind[j, , s]
+      )
+      idx <- idx + 1L
+    }
+  }
+
+  auc_samples
+}
+
 # Compute an ROC summary for a single rater
 .make_individual_roc <- function(post, rater = 1L, probs = c(0.025, 0.975)) {
   comp <- .compute_roc_components(post)
@@ -286,30 +304,16 @@ bayes_roc.BayesODT <- function(object,
   fpr <- vapply(seq_len(comp$K), function(k) mean(comp$sp[, k, ]), numeric(1))
   tpr <- vapply(seq_len(comp$K), function(k) mean(comp$se[, k, ]), numeric(1))
 
-  auc_samples <- vapply(seq_len(comp$num),
-                        function(s) {
-                          fpr_s <- vapply(seq_len(comp$K), function(k) mean(comp$sp[, k, s]), numeric(1))
-                          tpr_s <- vapply(seq_len(comp$K), function(k) mean(comp$se[, k, s]), numeric(1))
+  # AUC samples from all individual raters and all posterior draws
+  # length = number of raters * number of posterior draws
+  auc_samples <- .compute_all_rater_auc_samples(comp)
 
-                          cdf0_s <- 1 - fpr_s
-                          cdf1_s <- 1 - tpr_s
-
-                          p0_s <- .cumprob_to_mass(cdf0_s)
-                          p1_s <- .cumprob_to_mass(cdf1_s)
-
-                          .compute_auc(p0_s, p1_s)
-                          },
-                        numeric(1))
-
-  # Point-estimate AUC from posterior-averaged ROC1 probabilities
-  cdf0_hat <- 1 - fpr
-  cdf1_hat <- 1 - tpr
-  p0_hat <- .cumprob_to_mass(cdf0_hat)
-  p1_hat <- .cumprob_to_mass(cdf1_hat)
+  # Point-estimate AUC from the same AUC sample distribution
+  auc_hat <- mean(auc_samples, na.rm = TRUE)
 
   out <- .finish_roc_curve(fpr, tpr)
   out$cutpoint_index <- seq_len(comp$K)
-  out$auc <- .compute_auc(p0_hat, p1_hat)
+  out$auc <- auc_hat
   out$auc_samples <- auc_samples
   out$auc_ci <- .compute_auc_ci(auc_samples, probs = probs)
   out$type <- "ROC1"
@@ -324,15 +328,16 @@ bayes_roc.BayesODT <- function(object,
   fpr <- vapply(seq_len(comp$K), function(k) mean(comp$sp.mean[, k]), numeric(1))
   tpr <- vapply(seq_len(comp$K), function(k) mean(comp$se.mean[, k]), numeric(1))
 
-  auc_samples <- vapply(seq_len(comp$num), function(s) .compute_auc(comp$p0.mean[s, ], comp$p1.mean[s, ]), numeric(1))
+  # AUC samples from all individual raters and all posterior draws
+  # length = number of raters * number of posterior draws
+  auc_samples <- .compute_all_rater_auc_samples(comp)
 
-  # Point-estimate AUC from posterior mean category probabilities
-  p0_hat <- colMeans(comp$p0.mean)
-  p1_hat <- colMeans(comp$p1.mean)
+  # Point-estimate AUC from the same AUC sample distribution
+  auc_hat <- mean(auc_samples, na.rm = TRUE)
 
   out <- .finish_roc_curve(fpr, tpr)
   out$cutpoint_index <- seq_len(comp$K)
-  out$auc <- .compute_auc(p0_hat, p1_hat)
+  out$auc <- auc_hat
   out$auc_samples <- auc_samples
   out$auc_ci <- .compute_auc_ci(auc_samples, probs = probs)
   out$type <- "ROC2"

@@ -117,7 +117,136 @@ as.mcmc.BayesODT <- function(x,
 }
 
 
+#' Coerce all selected BayesODT posterior samples to coda mcmc objects
+#'
+#' Convert multiple posterior sample blocks from a `"BayesODT"` object to a
+#' single `coda::mcmc` object or a `coda::mcmc.list` object by column-binding
+#' all selected parameters within each chain.
+#'
+#' @param x A fitted object of class `"BayesODT"`.
+#' @param params Character vector specifying which parameters to extract.
+#'   Any subset of `"A"`, `"a"`, `"tau_a"`, `"b"`, `"mu_b"`, `"tau_b"`, and `"u"`.
+#'   By default, all are included.
+#' @param start Optional starting iteration for the `coda::mcmc` object.
+#'   If `NULL`, uses 1.
+#' @param thin Optional thinning interval for the `coda::mcmc` object.
+#'   If `NULL`, uses `x$mcmc_info$n.thin` when available, otherwise 1.
+#'
+#' @return
+#' If `x` contains one chain, returns an object of class `"mcmc"`.
+#' If `x` contains multiple chains, returns an object of class `"mcmc.list"`.
+#'
+#' @export
+as.mcmc_all <- function(x,
+                        params = c("A", "a", "tau_a", "b", "mu_b", "tau_b", "u"),
+                        start = NULL,
+                        thin = NULL) {
+  if (!inherits(x, "BayesODT")) {
+    stop("`x` must be an object of class 'BayesODT'.", call. = FALSE)
+  }
 
+  if (!requireNamespace("coda", quietly = TRUE)) {
+    stop("Package 'coda' is required for `as.mcmc_all()`. Please install it first.",
+         call. = FALSE)
+  }
+
+  if (is.null(x$chains) || !is.list(x$chains) || length(x$chains) == 0L) {
+    stop("The fitted object has no valid `chains` component.", call. = FALSE)
+  }
+
+  valid_params <- c("A", "a", "tau_a", "b", "mu_b", "tau_b", "u")
+
+  if (!is.character(params) || length(params) == 0L || anyNA(params)) {
+    stop("`params` must be a non-empty character vector.", call. = FALSE)
+  }
+
+  if (any(!params %in% valid_params)) {
+    stop(
+      sprintf(
+        "`params` must be chosen from: %s.",
+        paste(sprintf('"%s"', valid_params), collapse = ", ")
+      ),
+      call. = FALSE
+    )
+  }
+
+  params <- unique(params)
+
+  if (is.null(start)) {
+    start <- 1L
+  }
+
+  if (is.null(thin)) {
+    if (!is.null(x$mcmc_info) && !is.null(x$mcmc_info$n.thin)) {
+      thin <- x$mcmc_info$n.thin
+    } else {
+      thin <- 1L
+    }
+  }
+
+  # 각 param별로 전체 성분(index = NULL) 추출
+  obj_list <- lapply(params, function(p) {
+    as.mcmc.BayesODT(
+      x,
+      param = p,
+      index = NULL,
+      start = start,
+      thin = thin
+    )
+  })
+
+  # 각 결과를 chain 리스트 형태로 통일
+  obj_list <- lapply(obj_list, function(obj) {
+    if (inherits(obj, "mcmc")) {
+      list(obj)
+    } else if (inherits(obj, "mcmc.list")) {
+      obj
+    } else {
+      stop("Internal error: conversion did not return a valid `mcmc` or `mcmc.list` object.",
+           call. = FALSE)
+    }
+  })
+
+  nch <- length(obj_list[[1]])
+
+  if (!all(vapply(obj_list, length, integer(1)) == nch)) {
+    stop("Different numbers of chains across selected parameters.", call. = FALSE)
+  }
+
+  out <- vector("list", nch)
+
+  for (ch in seq_len(nch)) {
+    mats <- lapply(obj_list, function(obj) {
+      as.matrix(obj[[ch]])
+    })
+
+    # 행 수 일치 확인
+    nr <- vapply(mats, nrow, integer(1))
+    if (length(unique(nr)) != 1L) {
+      stop(sprintf("Different numbers of iterations found in chain %d across parameters.", ch),
+           call. = FALSE)
+    }
+
+    combined <- do.call(cbind, mats)
+
+    # 열이름 중복 방지
+    colnames(combined) <- make.unique(colnames(combined))
+
+    mcpar <- attr(obj_list[[1]][[ch]], "mcpar")
+
+    out[[ch]] <- coda::mcmc(
+      combined,
+      start = mcpar[1],
+      thin = mcpar[3]
+    )
+  }
+
+  if (length(out) == 1L) {
+    return(out[[1]])
+  }
+
+  coda::mcmc.list(out)
+}
 
 
 
@@ -182,43 +311,136 @@ plot_trace <- function(x,
         bty = "n"
       )
     } else {
-      old_par <- graphics::par(no.readonly = TRUE)
-      on.exit(graphics::par(old_par), add = TRUE)
-
       nch <- length(mcmc_obj)
-      graphics::par(mfrow = c(nch, 1))
 
-      for (i in seq_len(nch)) {
-        mat <- as.matrix(mcmc_obj[[i]])
-        iter <- .make_iter(mcmc_obj[[i]])
+      mats <- lapply(mcmc_obj, as.matrix)
+      iters <- lapply(mcmc_obj, .make_iter)
 
-        matplot(
-          x = iter,
-          y = mat,
-          type = "l",
-          lty = 1,
-          lwd = 1,
-          xlab = "Iterations",
-          ylab = "Value",
-          main = paste("Trace of A (chain", i, ")"),
-          ...
-        )
-        legend(
-          legend_pos,
-          legend = colnames(mat),
-          lty = 1,
-          lwd = 1,
-          col = seq_len(ncol(mat)),
-          bty = "n"
-        )
+      nA <- ncol(mats[[1]])
+      param_names <- colnames(mats[[1]])
+
+      y_range <- range(unlist(mats), finite = TRUE)
+      x_range <- range(unlist(iters), finite = TRUE)
+
+      A_cols <- seq_len(nA)
+      chain_ltys <- seq_len(nch)
+
+      graphics::plot(
+        x_range,
+        y_range,
+        type = "n",
+        xlab = "Iterations",
+        ylab = "Value",
+        main = "Trace of A",
+        ...
+      )
+
+      for (ch in seq_len(nch)) {
+        for (k in seq_len(nA)) {
+          graphics::lines(
+            iters[[ch]],
+            mats[[ch]][, k],
+            col = A_cols[k],
+            lty = chain_ltys[ch],
+            lwd = 1
+          )
+        }
       }
+
+      graphics::legend(
+        legend_pos,
+        legend = param_names,
+        col = A_cols,
+        lty = 1,
+        lwd = 1,
+        bty = "n"
+      )
+
+      graphics::legend(
+        "bottomright",
+        legend = paste("Chain", seq_len(nch)),
+        col = "black",
+        lty = chain_ltys,
+        lwd = 1,
+        bty = "n"
+      )
     }
 
     return(invisible(mcmc_obj))
   }
 
   mcmc_obj <- as.mcmc(x, param = param, index = index, start = start, thin = thin)
-  coda::traceplot(mcmc_obj)
+
+  .make_iter <- function(obj) {
+    mcpar <- attr(obj, "mcpar")
+    seq.int(from = mcpar[1], by = mcpar[3], length.out = nrow(as.matrix(obj)))
+  }
+
+  # single chain
+  if (inherits(mcmc_obj, "mcmc")) {
+    mat <- as.matrix(mcmc_obj)
+    iter <- .make_iter(mcmc_obj)
+
+    graphics::plot(
+      iter, mat[, 1],
+      type = "l",
+      lty = 1,
+      col = 1,
+      xlab = "Iterations",
+      ylab = "Value",
+      main = paste("Trace of", colnames(mat)[1])
+    )
+
+    return(invisible(mcmc_obj))
+  }
+
+  # multiple chains
+  if (inherits(mcmc_obj, "mcmc.list")) {
+    nch <- length(mcmc_obj)
+
+    mats <- lapply(mcmc_obj, as.matrix)
+    iters <- lapply(mcmc_obj, .make_iter)
+
+    param_names <- colnames(mats[[1]])
+
+    y_range <- range(
+      unlist(lapply(mats, function(mat) mat[, 1])),
+      finite = TRUE
+    )
+
+    x_range <- range(unlist(iters), finite = TRUE)
+
+    graphics::plot(
+      x_range, y_range,
+      type = "n",
+      xlab = "Iterations",
+      ylab = "Value",
+      main = paste("Trace of", param_names[1])
+    )
+
+    for (ch in seq_len(nch)) {
+      graphics::lines(
+        iters[[ch]],
+        mats[[ch]][, 1],
+        col = ch,
+        lty = 1,
+        lwd = 1
+      )
+    }
+
+    graphics::legend(
+      legend_pos,
+      legend = paste("Chain", seq_len(nch)),
+      col = seq_len(nch),
+      lty = 1,
+      lwd = 1,
+      bty = "n"
+    )
+
+    return(invisible(mcmc_obj))
+  }
+
+
   invisible(mcmc_obj)
 }
 #' Effective sample size for BayesODT posterior samples

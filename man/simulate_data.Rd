@@ -5,8 +5,8 @@
 \title{Simulate multirater ordinal diagnostic test data}
 \usage{
 simulate_data(
-  m = 50,
-  n = 10,
+  m = 90,
+  n = 50,
   K = 4,
   alpha = c(-1, 1, 2),
   mu_a = 0,
